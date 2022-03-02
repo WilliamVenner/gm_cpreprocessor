@@ -1,4 +1,4 @@
-use std::{path::{Path, PathBuf}, process::{Command, Stdio}, io::Write};
+use std::{path::{Path, PathBuf}, process::{Command, Stdio}, io::Write, ffi::OsStr};
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -96,10 +96,30 @@ impl Compiler {
 	}
 
 	fn msvc(path: &Path, code: &[u8]) -> Result<Vec<u8>> {
-		let src_path = std::env::temp_dir().join(format!("{}.c", uuid::Uuid::new_v4()));
+		#[repr(transparent)]
+		struct TempFileHandle(PathBuf);
+		impl Drop for TempFileHandle {
+			fn drop(&mut self) {
+				let _ = std::fs::remove_file(&self.0);
+			}
+		}
+		impl AsRef<Path> for TempFileHandle {
+			#[inline]
+			fn as_ref(&self) -> &Path {
+				&self.0
+			}
+		}
+		impl AsRef<OsStr> for TempFileHandle {
+			#[inline]
+			fn as_ref(&self) -> &OsStr {
+				self.0.as_os_str()
+			}
+		}
+
+		let src_path = TempFileHandle(std::env::temp_dir().join(format!("{}.c", uuid::Uuid::new_v4())));
 		std::fs::write(&src_path, code)?;
 
-		let res = capture({
+		capture({
 			Command::new(path)
 				.args(&["/EP", "/X"])
 				.arg(&src_path)
@@ -107,11 +127,7 @@ impl Compiler {
 				.stdout(Stdio::piped())
 				.stderr(Stdio::piped())
 				.spawn()?
-		});
-
-		let _ = std::fs::remove_file(src_path);
-
-		res
+		})
 	}
 }
 
