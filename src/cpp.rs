@@ -84,12 +84,7 @@ impl Compiler {
 	// Arguments are the same for Clang and Gnu gcc
 	fn gnu_clang(path: &Path, code: &[u8]) -> Result<Vec<u8>> {
 		let mut process = Command::new(path)
-			.arg("-nostdinc")
-			.arg("-P")
-			.arg("-E")
-			.arg("-x")
-			.arg("c")
-			.arg("-")
+			.args(&["-nostdinc", "-P", "-E", "-x", "c", "-"])
 			.stdin(Stdio::piped())
 			.stdout(Stdio::piped())
 			.stderr(Stdio::piped())
@@ -106,8 +101,7 @@ impl Compiler {
 
 		let res = capture({
 			Command::new(path)
-				.arg("/EP")
-				.arg("/X")
+				.args(&["/EP", "/X"])
 				.arg(&src_path)
 				.stdin(Stdio::piped())
 				.stdout(Stdio::piped())

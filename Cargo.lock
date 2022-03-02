@@ -120,7 +120,7 @@ dependencies = [
 
 [[package]]
 name = "gm_cpreprocessor"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "cc",
  "gmod",
