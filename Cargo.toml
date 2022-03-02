@@ -1,0 +1,20 @@
+[package]
+name = "gm_cpreprocessor"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+panic = "abort"
+opt-level = "s"
+
+[dependencies]
+gmod = "15"
+cc = "1"
+lazy_static = "1"
+uuid = { version = "0", features = ["v4"] }
