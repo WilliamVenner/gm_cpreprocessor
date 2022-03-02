@@ -9,67 +9,107 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build_linux:
+  build_linux64:
     runs-on: ubuntu-latest
     container: quay.io/pypa/manylinux2014_x86_64
     steps:
     - uses: actions/checkout@v2
-    - name: Install build dependencies
-      run: yum -y install glibc-devel.i686 libgcc.i686
+      with:
+        submodules: true
     - name: Install nightly toolchain
       uses: actions-rs/toolchain@v1
       with:
         profile: minimal
         toolchain: nightly
         override: true
-    - name: Add targets
-      run: rustup target add x86_64-unknown-linux-gnu && rustup target add i686-unknown-linux-gnu
-    - name: Build 32-bit
-      run: cargo build --release --target i686-unknown-linux-gnu
-    - name: Build 64-bit
+    - name: Add target
+      run: rustup target add x86_64-unknown-linux-gnu
+    - name: Checkout submodules
+      run: git submodule update --init --recursive
+    - name: Build
       run: cargo build --release --target x86_64-unknown-linux-gnu
     - name: Strip debug symbols
-      run: |
-        strip target/i686-unknown-linux-gnu/release/libgm_cpreprocessor.so
-        strip target/x86_64-unknown-linux-gnu/release/libgm_cpreprocessor.so
-    - name: Rename binaries
-      run: |
-        mv target/i686-unknown-linux-gnu/release/libgm_cpreprocessor.so target/i686-unknown-linux-gnu/release/gm_cpreprocessor_linux.dll
-        mv target/x86_64-unknown-linux-gnu/release/libgm_cpreprocessor.so target/x86_64-unknown-linux-gnu/release/gm_cpreprocessor_linux64.dll
+      run: strip target/x86_64-unknown-linux-gnu/release/libgm_cpreprocessor.so
+    - name: Rename file
+      run: mv target/x86_64-unknown-linux-gnu/release/libgm_cpreprocessor.so target/x86_64-unknown-linux-gnu/release/gm_cpreprocessor_linux64.dll
     - name: Release
       uses: softprops/action-gh-release@v1
       with:
-        files: |
-          target/i686-unknown-linux-gnu/release/gm_cpreprocessor_linux.dll
-          target/x86_64-unknown-linux-gnu/release/gm_cpreprocessor_linux64.dll
+        files: target/x86_64-unknown-linux-gnu/release/gm_cpreprocessor_linux64.dll
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
 
-  build_windows:
+  build_linux32:
+    runs-on: ubuntu-latest
+    container: quay.io/pypa/manylinux2014_i686
+    defaults:
+      run:
+        shell: sh
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+    - name: "Install Rust"
+      run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-host i686-unknown-linux-gnu --default-toolchain nightly -y
+    - name: Checkout submodules
+      run: git submodule update --init --recursive
+    - name: Build
+      run: |
+        source $HOME/.cargo/env
+        cargo build --release --target i686-unknown-linux-gnu
+    - name: Strip debug symbols
+      run: strip target/i686-unknown-linux-gnu/release/libgm_cpreprocessor.so
+    - name: Move file
+      run: mkdir target/i686-unknown-linux-gnu/release/bin && mv target/i686-unknown-linux-gnu/release/libgm_cpreprocessor.so target/i686-unknown-linux-gnu/release/bin/gm_cpreprocessor_linux.dll
+    - name: Release
+      uses: fnkr/github-action-ghr@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      env:
+        GHR_PATH: target/i686-unknown-linux-gnu/release/bin
+        GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+
+  build_win64:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v2
+      with:
+        submodules: true
     - name: Install nightly toolchain
       run: rustup toolchain install nightly
-    - name: Add targets
-      run: rustup target add x86_64-pc-windows-msvc && rustup target add i686-pc-windows-msvc
-    - name: Build 64-bit
+    - name: Add target
+      run: rustup target add x86_64-pc-windows-msvc
+    - name: Build
       run: cargo build --release --target x86_64-pc-windows-msvc
       env:
         RUSTFLAGS: -Ctarget-feature=+crt-static
-    - name: Build 32-bit
-      run: cargo build --release --target i686-pc-windows-msvc
-      env:
-        RUSTFLAGS: -Ctarget-feature=+crt-static
-    - name: Rename binaries
-      run: |
-        mv target/i686-pc-windows-msvc/release/gm_cpreprocessor.dll target/i686-pc-windows-msvc/release/gm_cpreprocessor_win32.dll
-        mv target/x86_64-pc-windows-msvc/release/gm_cpreprocessor.dll target/x86_64-pc-windows-msvc/release/gm_cpreprocessor_win64.dll
+    - name: Rename files
+      run: ren target/x86_64-pc-windows-msvc/release/gm_cpreprocessor.dll gm_cpreprocessor_win64.dll
     - name: Release
       uses: softprops/action-gh-release@v1
       with:
-        files: |
-          target/i686-pc-windows-msvc/release/gm_cpreprocessor_win32.dll
-          target/x86_64-pc-windows-msvc/release/gm_cpreprocessor_win64.dll
+        files: target/x86_64-pc-windows-msvc/release/gm_cpreprocessor_win64.dll
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+
+  build_win32:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: true
+    - name: Install nightly toolchain
+      run: rustup toolchain install nightly
+    - name: Add target
+      run: rustup target add i686-pc-windows-msvc
+    - name: Build
+      run: cargo build --release --target i686-pc-windows-msvc
+      env:
+        RUSTFLAGS: -Ctarget-feature=+crt-static
+    - name: Rename files
+      run: ren target/i686-pc-windows-msvc/release/gm_cpreprocessor.dll gm_cpreprocessor_win32.dll
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: target/i686-pc-windows-msvc/release/gm_cpreprocessor_win32.dll
+      env:
+        GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
